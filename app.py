@@ -1,8 +1,15 @@
 from pdf_processor import extract_text_from_pdf
+from pdf_processor import create_chunks
+
+from vector_store import store_chunks
 
 
-pdf_path = "data/sample.pdf"
+text = extract_text_from_pdf(
+    "data/sample.pdf"
+)
 
-text = extract_text_from_pdf(pdf_path)
+chunks = create_chunks(text)
 
-print(text)
+store_chunks(chunks)
+
+print("Chunks stored successfully.")
