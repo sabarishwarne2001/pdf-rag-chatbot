@@ -11,7 +11,7 @@ client = Groq(
 )
 
 
-def ask_rag(question):
+def ask_rag(question,messages):
 
     results = search_chunks(question)
 
@@ -38,13 +38,36 @@ def ask_rag(question):
         results["documents"][0]
     )
 
-    prompt = f"""
-Use ONLY the provided context to answer.
+    recent_messages = messages[-4:]
 
-Context:
+    conversation_history = ""
+
+    for message in recent_messages:
+
+        conversation_history += (
+            f"{message['role'].capitalize()}: "
+            f"{message['content']}\n"
+        )
+
+
+    prompt = f"""
+You are a helpful AI assistant.
+
+Use the previous conversation for follow-up questions.
+
+Use ONLY the provided document context when answering.
+
+Conversation History:
+{conversation_history}
+
+-------------------------
+
+Document Context:
 {context}
 
-Question:
+-------------------------
+
+Current Question:
 {question}
 """
 

@@ -221,7 +221,10 @@ if question:
 
         if has_documents():
 
-            answer = ask_rag(question)
+            answer = ask_rag(
+                question,
+                st.session_state.message
+                )
 
         else:
 
