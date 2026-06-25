@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 
 from pdf_processor import extract_text_from_pdf, create_chunks
 from rag_engine import ask_rag
@@ -103,6 +104,11 @@ if uploaded_files:
     with st.spinner("Processing PDFs..."):
 
         for uploaded_file in uploaded_files:
+
+            os.makedirs(
+                "data",
+                exist_ok=True
+            )
 
             pdf_path = f"data/{uploaded_file.name}"
 
