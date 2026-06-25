@@ -223,7 +223,7 @@ if question:
 
             answer = ask_rag(
                 question,
-                st.session_state.message
+                st.session_state.messages
                 )
 
         else:
