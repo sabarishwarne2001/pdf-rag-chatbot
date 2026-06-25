@@ -1,14 +1,68 @@
-from pdf_processor import extract_text_from_pdf
-from pdf_processor import create_chunks
-from vector_store import store_chunks
-from rag_engine import ask_rag
-from vector_store import clear_database
 import streamlit as st
-from vector_store import has_documents
 
+from pdf_processor import extract_text_from_pdf, create_chunks
+from rag_engine import ask_rag
 
+from vector_store import (
+    store_chunks,
+    clear_database,
+    has_documents,
+    document_exists,
+    get_chunk_count,
+    get_documents
+)
+
+# --------------------------------------------------
+# Page Configuration
+# --------------------------------------------------
+
+st.set_page_config(
+    page_title="AI Document Assistant",
+    page_icon="📄",
+    layout="wide"
+)
+
+# --------------------------------------------------
+# Session State
+# --------------------------------------------------
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# --------------------------------------------------
 # Sidebar
-st.sidebar.title("Database Controls")
+# --------------------------------------------------
+
+st.sidebar.title("⚙️ Control Panel")
+
+st.sidebar.markdown("---")
+
+st.sidebar.subheader("📊 Statistics")
+st.sidebar.write(
+    "Upload one or more PDF documents to build your AI knowledge base."
+)
+
+documents = get_documents()
+
+col1, col2 = st.sidebar.columns(2)
+
+with col1:
+    st.metric("Docs", len(documents))
+
+with col2:
+    st.metric("Chunks", get_chunk_count())
+
+st.sidebar.markdown("---")
+
+st.sidebar.subheader("📚 Knowledge Base")
+
+if documents:
+    for document in documents:
+        st.sidebar.write(f"✅ {document}")
+else:
+    st.sidebar.info("No documents indexed.")
+
+st.sidebar.markdown("---")
 
 if st.sidebar.button("🗑️ Clear Database"):
 
@@ -16,30 +70,34 @@ if st.sidebar.button("🗑️ Clear Database"):
 
     st.session_state.messages = []
 
-    st.sidebar.success(
-        "Database cleared successfully!"
-    )
+    st.sidebar.success("Database cleared successfully!")
 
     st.rerun()
 
+# --------------------------------------------------
+# App Header
+# --------------------------------------------------
 
-# Session State
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+st.title("📄 AI Document Assistant")
 
+st.caption(
+    "Ask questions across one or more PDF documents using Retrieval-Augmented Generation (RAG)."
+)
 
-# Title
-st.title("📄 PDF RAG Chatbot")
-
-
+# --------------------------------------------------
 # PDF Upload
+# --------------------------------------------------
+
 uploaded_files = st.file_uploader(
-    "Upload a PDF",
+    "Upload PDF Files",
     type=["pdf"],
     accept_multiple_files=True
 )
 
-# UPLOAD AREA
+indexed_files = []
+duplicate_files = []
+failed_files = []
+
 if uploaded_files:
 
     with st.spinner("Processing PDFs..."):
@@ -51,36 +109,98 @@ if uploaded_files:
             with open(pdf_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            text = extract_text_from_pdf(pdf_path)
+            if document_exists(uploaded_file.name):
 
-            chunks = create_chunks(text)
+                duplicate_files.append(uploaded_file.name)
 
-            store_chunks(chunks,uploaded_file.name)
+                continue
 
-    st.success(f"{len(uploaded_files)} PDF(s) processed successfully!")
+            try:
 
+                text = extract_text_from_pdf(pdf_path)
 
-# Display Chat History
+                if not text.strip():
+
+                    failed_files.append(uploaded_file.name)
+
+                    continue
+
+                chunks = create_chunks(text)
+
+                store_chunks(
+                    chunks,
+                    uploaded_file.name
+                )
+
+                indexed_files.append(uploaded_file.name)
+
+            except Exception as e:
+
+                failed_files.append(uploaded_file.name)
+
+                print(e)
+
+                continue
+
+# --------------------------------------------------
+# Upload Summary
+# --------------------------------------------------
+
+if indexed_files or duplicate_files or failed_files:
+
+    st.subheader("📄 Upload Summary")
+
+    if indexed_files:
+
+        with st.expander(
+            f"✅ Indexed ({len(indexed_files)})",
+            expanded=True
+        ):
+            for file in indexed_files:
+                st.write(f"• {file}")
+
+    if duplicate_files:
+
+        with st.expander(
+            f"⚠️ Already Indexed ({len(duplicate_files)})"
+        ):
+            for file in duplicate_files:
+                st.write(f"• {file}")
+
+    if failed_files:
+
+        with st.expander(
+            f"❌ Failed ({len(failed_files)})"
+        ):
+            for file in failed_files:
+                st.write(f"• {file}")
+
+st.divider()
+
+# --------------------------------------------------
+# Chat History
+# --------------------------------------------------
+
 for message in st.session_state.messages:
 
-    with st.chat_message(
-        message["role"]
-    ):
-        st.markdown(
-            message["content"]
-        )
+    with st.chat_message(message["role"]):
 
+        st.markdown(message["content"])
 
+# --------------------------------------------------
 # Chat Input
+# --------------------------------------------------
+
 question = st.chat_input(
-    "Ask a question about your PDF"
+    "Ask a question about your documents"
 )
 
-
+# --------------------------------------------------
 # Chat Logic
+# --------------------------------------------------
+
 if question:
 
-    # Store user message
     st.session_state.messages.append(
         {
             "role": "user",
@@ -88,31 +208,37 @@ if question:
         }
     )
 
-    # Display user message
     with st.chat_message("user"):
         st.markdown(question)
 
-    # Generate answer
     with st.spinner("Thinking..."):
-        
-        if not has_documents():
 
-            answer = (
-        "⚠️ Please upload and process "
-        "at least one PDF first."
-        )
+        if has_documents():
 
-        else:
             answer = ask_rag(question)
 
-    # Display assistant answer
+        else:
+
+            answer = (
+                "⚠️ Please upload and process at least one PDF first."
+            )
+
     with st.chat_message("assistant"):
         st.markdown(answer)
 
-    # Store assistant answer
     st.session_state.messages.append(
         {
             "role": "assistant",
             "content": answer
         }
     )
+
+# --------------------------------------------------
+# Footer
+# --------------------------------------------------
+
+st.divider()
+
+st.caption(
+    "Powered by Streamlit • Groq • Llama 3.3 • ChromaDB"
+)

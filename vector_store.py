@@ -89,3 +89,37 @@ def has_documents():
     count = collection.count()
 
     return count > 0
+
+def document_exists(filename):
+    """
+    Check if a document with this filename
+    already exists in the database.
+    """
+
+    results = collection.get(
+        where={"source": filename}
+    )
+
+    return len(results["ids"]) > 0
+
+def get_chunk_count():
+
+    return collection.count()
+
+def get_documents():
+    """
+    Return all unique document names
+    stored in ChromaDB.
+    """
+
+    results = collection.get()
+
+    documents = set()
+
+    for metadata in results["metadatas"]:
+
+        documents.add(
+            metadata["source"]
+        )
+
+    return sorted(documents)
