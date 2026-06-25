@@ -1,5 +1,6 @@
 from sentence_transformers import SentenceTransformer
 import chromadb
+import uuid
 
 
 embedding_model = SentenceTransformer(
@@ -19,7 +20,7 @@ def create_embeddings(chunks):
     return embedding_model.encode(chunks)
 
 
-def store_chunks(chunks):
+def store_chunks(chunks,source):
     """
     Store chunks in ChromaDB
     """
@@ -27,12 +28,64 @@ def store_chunks(chunks):
     embeddings = create_embeddings(chunks)
 
     ids = []
+    for _ in chunks:
+        ids.append(str(uuid.uuid4()))
 
-    for i in range(len(chunks)):
-        ids.append(str(i))
+#         ids = [
+#     str(uuid.uuid4())
+#     for _ in chunks
+# ]
+
+    metadatas = []
+
+    for chunk in chunks:
+        metadatas.append(
+        {
+            "source": source
+        }
+    )
+
+    # metadata=[
+    # {"source": source} 
+    # for _ in chunks
+    # ]
 
     collection.add(
         ids=ids,
         documents=chunks,
-        embeddings=embeddings.tolist()
+        embeddings=embeddings.tolist(),
+        metadatas=metadatas
+    
     )
+
+def search_chunks(query, n_results=2):
+    """
+    Retrieve the most relevant chunks.
+    """
+
+    query_embedding = embedding_model.encode(query)
+
+    results = collection.query(
+        query_embeddings=[query_embedding.tolist()],
+        n_results=n_results
+    )
+
+    return results
+
+def clear_database():
+    """
+    Delete all stored chunks.
+    """
+
+    client.delete_collection("pdf_chunks")
+
+    global collection
+
+    collection = client.get_or_create_collection(
+        name="pdf_chunks"
+    )
+def has_documents():
+
+    count = collection.count()
+
+    return count > 0
